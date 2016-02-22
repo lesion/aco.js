@@ -11,27 +11,28 @@ module.exports = (function() {
     Node = require('node')
 
   self.init = function(w, h, wo) {
-    $('body').css('maxWidth', width)
-    $('body').append(`<canvas id="canvas"  width="${w}" height="${h}"></canvas>`)
+    // $('body').css('maxWidth', width)
+    // $('body').append(`<canvas id="canvas"  width="${w}" height="${h}" style="width: ${w*2}; height: ${h*2}"></canvas>`)
     world = wo
     world.canvas = self
     height = h
     width = w
-    canvas_element = $('#canvas')[0]
+    canvas_element = document.getElementsByTagName('canvas')[0]//$('#canvas')[0]
     canvas = canvas_element.getContext('2d')
     edge_mode = false
     tmp_edge = null
     $(canvas_element).click(on_click)
 
     clear()
+    return self
   }
 
   self.random_map = function() {
-    let n_elements = 200
+    let n_elements = 50
     let n_edge = n_elements * 4
 
     for (let i = 0; i < n_elements; i++)
-      world.add_random_node(height,width)
+      world.add_random_node(width,height)
 
     for (let i = 0; i < n_edge; i++) 
       world.add_random_edge()
@@ -41,7 +42,7 @@ module.exports = (function() {
 
 
   function init_edge_mode(node) {
-    tmp_edge = new Edge(node, new Node(0, 0))
+    tmp_edge = new Edge(node, new Node(0, 0),true)
     edge_mode = true
     $(canvas_element).on('mousemove', on_move)
 
@@ -50,7 +51,7 @@ module.exports = (function() {
   function end_edge_mode(node) {
     tmp_edge.setTo(node)
     world.add_edge(tmp_edge)
-    tmp_edge = new Edge(node, new Node(0, 0))
+    tmp_edge = new Edge(node, new Node(0, 0),true)
     self.reset()
   }
 
@@ -92,7 +93,7 @@ module.exports = (function() {
 
   self.reset =function() {
     clear()
-    draw_nodes()
+    self.draw_nodes()
     self.draw_edges()
   }
 
@@ -109,17 +110,20 @@ module.exports = (function() {
 
     }
 
-    self.draw_edge(tmp_edge, '#f60', 0.6, 3.5)
+    self.draw_edge(tmp_edge, '#f60', 0.5, 2)
   }
 
 
-  function draw_nodes() {
-    world.get_nodes().map(node => self.draw_node(node))
+  self.draw_nodes = function(nodes) {
+    if(nodes)
+      nodes.map(node => self.draw_node(node,2,'#c99'))
+    else
+      world.get_nodes().map(node => self.draw_node(node))
   }
 
 
 
-  self.draw_edges = function(edges = false, color = '#000', alpha = 0.4, lineWidth = 2) {
+  self.draw_edges = function(edges = false, color = '#000', alpha = 0.4, lineWidth = 1) {
     if (!edges)
       world.get_edges().map(edge => self.draw_edge(edge, color, alpha, lineWidth))
     else
@@ -130,7 +134,7 @@ module.exports = (function() {
     canvas.clearRect(0, 0, width, height);
   }
 
-  self.draw_node = function(node, size = 3, color = '#00f', alpha = 0.9) {
+  self.draw_node = function(node, size = 1, color = '#00f', alpha = 0.9) {
 
     canvas.shadowColor = '#666';
     canvas.shadowBlur = 5;
@@ -144,7 +148,7 @@ module.exports = (function() {
     canvas.fill();
   }
 
-  self.draw_edge = function(edge, color = '#000', alpha = 0.4, lineWidth = 2) {
+  self.draw_edge = function(edge, color = '#000', alpha = 0.4, lineWidth = 1) {
     canvas.shadowBlur = 0;
     canvas.globalAlpha = alpha;
     canvas.strokeStyle = color;

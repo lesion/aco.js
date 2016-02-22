@@ -1,0 +1,15 @@
+#container
+  canvas(width="900px",height="600px")
+  #panel
+    .left
+      button(@click='restart') Clear All
+      button(@click='random_map') Generate random map
+      button(@click='add_node') Add random Node
+      button(@click='add_edge') Add random Edge
+      button(@click='load_map') Load map
+
+    .left
+      ul
+        li n.nodes {{ n_nodes }}
+        li n.edges {{ n_edges }}
+        li length {{ edges_length }}

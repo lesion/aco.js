@@ -2,33 +2,69 @@ module.exports = (function() {
 
   var self = {}
 
-  let edges = []
-  let nodes = []
-  let ants = []
+  self.edges = []
+  self.nodes = []
   let Edge = require('edge')
   let Node = require('node')
 
-  let edges_length = 0
+  let best_path
 
-  self.restart = function(){
-    edges = []
-    nodes = []
-    edges_length = 0
+  self.edges_length = 0
+  
+
+  self.load = function() {
+    $.getJSON('map2.json')
+      .then(loaded_edges => {
+        loaded_edges.forEach(e => {
+          let nodeFrom = new Node(e[0][0], e[0][1])
+          let nodeTo = new Node(e[1][0], e[1][1])
+
+          if (!nodeFrom.in(self.nodes))
+            self.nodes.push(nodeFrom)
+          if (!nodeTo.in(self.nodes))
+            self.nodes.push(nodeTo)
+          try {
+            self.edges.push(new Edge(nodeFrom.in(self.nodes), nodeTo.in(self.nodes),false))
+          }
+          catch(e){
+            console.log(e)
+          }
+        })
+        self.canvas.reset()
+      })
+  }
+
+  self.save = function() {
+    return self.edges.map(edge => [
+      [edge.nodeFrom.x, edge.nodeFrom.y],
+      [edge.nodeTo.x, edge.nodeTo.y]
+    ])
+  }
+
+  self.restart = function() {
+    console.log('deosidnfo')
+    self.edges = []
+    self.nodes = []
+    self.edges_length = 0
+    this.canvas.reset()
+  }
+
+  self.get_best_path = function() {
+    return best_path
   }
 
   self.add_node = function(node) {
-    nodes.push(node)
+    self.nodes.push(node)
     self.canvas.draw_node(node)
-    $('#n_nodes').html(nodes.length)
     return node
   }
 
   self.get_random_node = function() {
-    return nodes[Math.floor(Math.random() * nodes.length)]
+    return self.nodes[Math.floor(Math.random() * self.nodes.length)]
   }
 
   self.get_random_edge = function() {
-    return edges[Math.floor(Math.random() * edges.length)]
+    return self.edges[Math.floor(Math.random() * self.edges.length)]
   }
 
   function rand(max) {
@@ -37,8 +73,7 @@ module.exports = (function() {
 
   self.add_random_node = function(max_x, max_y) {
     var node = new Node(rand(max_x), rand(max_y))
-    if(nodes.findIndex(n=>n.equals(node)) !== -1)
-    {
+    if (self.nodes.findIndex(n => n.equals(node)) !== -1) {
       self.add_random_node()
       return
     }
@@ -46,78 +81,85 @@ module.exports = (function() {
   }
 
   self.add_random_edge = function() {
-    var nodeFrom = rand(nodes.length)
-    var nodeTo = rand(nodes.length)
+    var nodeFrom = rand(self.nodes.length)
+    var nodeTo = rand(self.nodes.length)
 
     // ensure node index is different
-    while(nodeTo===nodeFrom)
-      nodeTo = rand(nodes.length)
+    while (nodeTo === nodeFrom)
+      nodeTo = rand(self.nodes.length)
 
-    let edge = new Edge(nodes[nodeFrom],nodes[nodeTo])
+    let edge = new Edge(self.nodes[nodeFrom], self.nodes[nodeTo])
     self.add_edge(edge)
   }
 
   let Ant = require('ant')
-  self.add_ant = function() {
-    var a = new Ant()
-    ants.push(a)
-    console.log(a.move())
+
+  self.search_odd_node = function() {
+    console.log("Total self.nodes " + self.nodes.length)
+    let odds = self.nodes.filter(node => node.connections.length % 2)
+    console.log("Odd self.nodes: " + odds.length)
+    self.canvas.draw_nodes(odds)
   }
 
-  self.cycle = function(){
-    let n_ants = 100
+
+
+  self.cycle = function() {
+    let n_ants = 60
+    let n_cycle = 10
+
     let a = new Ant()
-    let best_path = []
+    best_path = []
     let best_path_l = Infinity
 
-    for(let i=0;i<n_ants;i++)
-    {
-      a.reset()
-      a.move()
-      if(a.path_l<best_path_l){
-        console.log('trovato best: ' + a.path_l)
-        best_path = a.path.slice()
-        best_path_l = a.path_l
+    for (let n = 0; n < n_cycle; n++) {
+      console.log("cycle " + n)
+      for (let i = 0; i < n_ants; i++) {
+        a.reset()
+        a.run()
+        if (a.path_l < best_path_l) {
+          console.log('trovato best: ' + a.path.length + " " + a.path_l)
+          best_path = a.path.slice()
+          best_path_l = a.path_l
+        }
+
       }
 
+      console.log(best_path_l)
+        // sul path migliore, metto dei pesi
+      for (let edge of best_path) {
+        edge.nodeFrom.add_pherormone(edge)
+      }
     }
-
-    // sul path migliore, metto dei pesi
-    // for(edge of best_path){
-      // edge.nodeFrom.
-    // }
-
 
   }
 
   self.get_connected_edges = function(el) {
     let res = []
     if (el instanceof Edge)
-      res = edges.filter(e => e.connected(el))
+      res = self.edges.filter(e => e.connected(el))
     else if (el instanceof Node)
-      res = edges.filter(e => e.nodeFrom.equals(el) || e.nodeTo.equals(el))
+      res = self.edges.filter(e => e.nodeFrom.equals(el) || e.nodeTo.equals(el))
     return res
   }
 
   self.add_edge = function(edge) {
-    if (!edge.in(edges) && !edge.nodeFrom.equals(edge.nodeTo)){
-      edges.push(edge)
+    if (!edge.in(self.edges)) {
+      self.edges.push(edge)
+
       self.canvas.draw_edge(edge)
-      $('#n_edges').html(edges.length)
-      edges_length += edge.weight
-      $('#edges_length').html(edges_length)
-    }
-    else
+      self.edges_length += edge.weight
+      self.edges_length = parseFloat(self.edges_length).toFixed(2)
+    } else
       console.log('edge doppio o nodeFrom=nodeTo')
     return edge
   }
 
 
-  self.get_nodes = () => nodes
-  self.get_edges = () => edges
+  self.get_nodes = () => self.nodes
+  self.get_edges = () => self.edges
 
   self.get_node_at = function(x, y) {
-    let res = nodes.filter(node => (node.x === x && node.y === y))
+    let res = self.nodes.filter(node => (node.x === x && node.y === y))
     if (res.length === 1)
       return res[0]
     else
@@ -125,7 +167,7 @@ module.exports = (function() {
   }
 
   self.get_node_near = function(x, y, distance) {
-    let res = nodes.filter(function(node) {
+    let res = self.nodes.filter(function(node) {
       return node.distance(x, y) <= distance
     })
     if (res.length >= 1)

@@ -1,0 +1,29 @@
+{
+  "name": "aco",
+  "description": "",
+  "main": "index.js",
+  "authors": [
+    "Rocco De Patto <rocco.depatto@gmail.com (http://lesion.github.io/)"
+  ],
+  "license": "ISC",
+  "homepage": "https://github.com/lesion/aco.js",
+  "moduleType": [],
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "overrides": {
+    "lodash": {
+      "main": "lodash.js"
+    }
+  },
+  "dependencies": {
+    "vue": "^1.0.16",
+    "lodash": "^4.5.0",
+    "jquery": "^2.2.0"
+  }
+}

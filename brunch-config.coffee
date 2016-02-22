@@ -5,3 +5,11 @@ module.exports=
       javascripts:
         joinTo:
           'app.js': /^app/
+          'vendor.js': /^(bower_components|node_modules)/
+      stylesheets:
+        joinTo:
+          'app.css': /^app/
+      templates:
+        joinTo:
+          'templates.js': /^app/
+
