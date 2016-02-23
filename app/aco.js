@@ -5,8 +5,9 @@ new Vue({
   template: require('view/world')(),
   replace: true,
   data: {
-    world: null,
-    canvas: null
+    // world: null,
+    // canvas: null,
+    // ant: {}
   },
   created: function() {
     console.log('sdf')
@@ -48,6 +49,32 @@ new Vue({
     },
     load_map: function(){
       this.world.load()
+    },
+    save_map: function(){
+      var link = document.createElement('a')
+      document.body.appendChild(link)
+      var data = JSON.stringify(this.world.save())
+      var jsonData = 'data:application/json;charset=utf-8,' + encodeURIComponent(data)
+      link.href = jsonData
+      link.target = '_blank'
+      link.download = 'map.json'
+      link.click()
+      document.body.removeChild(link)
+    },
+    search_odd_node: function(){
+      this.world.search_odd_node()
+    },
+    create_ant: function(){
+      var Ant = require('ant')
+      this.ant = new Ant()
+    },
+    move_ant: function(){
+      console.log('vado di move')
+      this.ant.move()
+      console.log('vado di move fine')
+    },
+    remove_leafs : function(){
+      this.world.remove_leafs()
     }
 
   }

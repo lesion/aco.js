@@ -119,8 +119,9 @@ new Vue({
   template: require('view/world')(),
   replace: true,
   data: {
-    world: null,
-    canvas: null
+    // world: null,
+    // canvas: null,
+    // ant: {}
   },
   created: function created() {
     console.log('sdf');
@@ -161,6 +162,32 @@ new Vue({
     },
     load_map: function load_map() {
       this.world.load();
+    },
+    save_map: function save_map() {
+      var link = document.createElement('a');
+      document.body.appendChild(link);
+      var data = JSON.stringify(this.world.save());
+      var jsonData = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
+      link.href = jsonData;
+      link.target = '_blank';
+      link.download = 'map.json';
+      link.click();
+      document.body.removeChild(link);
+    },
+    search_odd_node: function search_odd_node() {
+      this.world.search_odd_node();
+    },
+    create_ant: function create_ant() {
+      var Ant = require('ant');
+      this.ant = new Ant();
+    },
+    move_ant: function move_ant() {
+      console.log('vado di move');
+      this.ant.move();
+      console.log('vado di move fine');
+    },
+    remove_leafs: function remove_leafs() {
+      this.world.remove_leafs();
     }
 
   }
@@ -210,31 +237,32 @@ function Ant() {
 
   this.world = require('world');
   this.canvas = require('canvas');
-  this.visited_edge = [];
-  this.unvisited_edge = this.world.get_edges().slice();
+  this.visited_edge = {};
+  this.unvisited_edge = _.cloneDeep(this.world.edges);
   this.path = [];
   this.path_l = 0;
   this.current_node = start_node;
 
-  this.last_edge = null;
+  this.last_edge_id = -1;
 
-  if (!this.current_node) this.current_node = this.world.get_random_node();
+  if (!this.current_node) this.current_node = this.world.get_random_leaf_node();
 }
 
 Ant.prototype.reset = function () {
-  this.visited_edge = [];
-  this.unvisited_edge = this.world.get_edges().slice();
+  this.visited_edge = {};
+  this.unvisited_edge = _.cloneDeep(this.world.edges);
   this.path = [];
   this.path_l = 0;
-  this.current_node = this.world.get_random_node();
+  this.last_edge_id = -1;
+  this.current_node = this.world.get_random_leaf_node();
 };
 
-Ant.prototype.visit = function (edge) {
+Ant.prototype.visit = function (edge_id) {
 
-  // console.log(edge) 
+  var edge = this.current_node.connections[edge_id];
 
   // add this edge to path
-  this.path.push(edge);
+  this.path.push(edge_id);
 
   // increase the path length
   this.path_l += edge.weight;
@@ -243,78 +271,89 @@ Ant.prototype.visit = function (edge) {
   // console.log(this.current_node.connection_weight)
 
   // update current node
-  this.current_node = this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom;
+  this.current_node = this.current_node.other_size(edge); //(this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom)
 
   //add this edge to visited one
   // this.visited_edge.push(edge)
 
   // search the index of this edge in unvisited edges
-  var edge_index = this.unvisited_edge.findIndex(function (e) {
-    return edge.equals(e);
-  });
-  this.last_edge = edge;
+  // let edge_index = this.unvisited_edge.findIndex(e => edge.equals(e))
+  this.last_edge_id = edge_id;
   //remove this edge from unvisited edges!
-  if (edge_index > -1) this.unvisited_edge.splice(edge_index, 1);
+  // if (edge_index > -1)
+  delete this.unvisited_edge[edge_id];
+  // this.unvisited_edge.splice(edge_index, 1)
+
+  this.canvas.draw_edge(edge, '#f66', 0.4, 3);
 
   // edge.add_pherormone()
 };
 
+// faccio una mossa
 Ant.prototype.move = function () {
-
-  var next_edge = null;
-  // se ho solamente due scelte, vado avanti
-  if (this.current_node.connections.length == 2 && this.last_edge != null) {
-    if (this.current_node.connections[0].equals(this.last_edge)) next_edge = this.current_node.connections[1];else next_edge = this.current_node.connections[0];
-    // this.canvas.draw_node(this.current_node, 2, '#f66',0.5)
-    this.visit(next_edge);
-    this.canvas.draw_edge(next_edge, '#f66', 0.4, 3);
-    this.move();
-    return false;
-  } else next_edge = this.decision_maker();
-
-  // this.canvas.draw_node(this.current_node, 2, '#f66')
-  this.visit(next_edge);
-  this.canvas.draw_edge(next_edge, '#f66', 0.4, 3);
-  // this.canvas.draw_edge(next_edge, '#f66')
-
-  // check if path is complete and all edges are visited
   if (this.has_finish()) {
+    console.log('FINITO!');
     return [this.path_l, this.path];
   }
+  if (this.forced_move()) return false;
+  var next_edge_id = this.decision_maker();
+  this.visit(next_edge_id);
+  this.forced_move();
+
   return false;
 };
 
-Ant.prototype.run = function () {
-  // let next_edge = null
-  var ret = this.move();
-  while (ret == false) {
-    ret = this.move();
+// fa una mossa forzata (ad esempio se sono davanti ad un vicolo cieco o se posso solo andare avanti)
+Ant.prototype.forced_move = function () {
+  var edges = _.map(this.current_node.connections, function (edge) {
+    return edge.id;
+  });
+  var next_edge_id = null;
+  if (edges.length == 1) next_edge_id = edges[0];else if (edges.length === 2 && this.last_edge_id != null) {
+    if (edges[0] === last_edge_id) next_edge_id = edges[1];else next_edge_id = edges[0];
   }
-  console.log(ret);
-  console.log('sono qui ?');
-  return ret;
+
+  if (!next_edge_id) return false;
+
+  this.visit(next_edge_id);
+  this.forced_move();
+  return true;
+};
+
+Ant.prototype.run = function () {
+  var that = this;
+  var ret = this.move();
+  var loop = setInterval(function () {
+    ret = that.move();
+    if (ret != false) {
+      console.log('finito!!');
+      clearTimeout(loop);
+    }
+  }, 50);
 };
 
 Ant.prototype.has_finish = function () {
-  return this.unvisited_edge.length === 0;
+  console.log(this.unvisited_edge.length, "unvisited");
+  return _.size(this.unvisited_edge.length) === 0;
 };
 
 Ant.prototype.is_unvisited = function (edge) {
-  return edge.in(this.unvisited_edge);
-};
-
-Ant.prototype.is_visited = function (edge) {
-  return edge.in(this.visited_edge);
-};
-
-Ant.prototype.n_visited = function (edge) {
-  var v = this.path.reduce(function (tot, e) {
-    return e.equals(edge) ? ++tot : tot;
-  }, 0);
-  return v;
+  return this.unvisited_edge[edge.id];
 };
 
 var choose = require('choose');
+
+/**
+ * It selects a move by applying a probabilistic decision rule. The
+probabilistic decision rule is a function of (1) the locally available
+pheromone trails and heuristic values (i.e., pheromone trails and
+heuristic values associated with components and connections in the
+neighborhood of the ant’s current location on graph GC); (2) the
+ant’s private memory storing its current state; and (3) the problem
+constraints.
+ * [decision_maker description]
+ * @return {[type]} [description]
+ */
 Ant.prototype.decision_maker = function () {
   var _this = this;
 
@@ -374,7 +413,8 @@ module.exports = (function () {
       width = undefined,
       edge_mode = undefined,
       canvas_element = undefined,
-      tmp_edge = undefined,
+      tmp_nodeFrom = undefined,
+      tmp_nodeTo = undefined,
       world = undefined,
       Edge = require('edge'),
       Node = require('node');
@@ -389,7 +429,7 @@ module.exports = (function () {
     canvas_element = document.getElementsByTagName('canvas')[0]; //$('#canvas')[0]
     canvas = canvas_element.getContext('2d');
     edge_mode = false;
-    tmp_edge = null;
+    // tmp_edge = null
     $(canvas_element).click(on_click);
 
     clear();
@@ -408,15 +448,18 @@ module.exports = (function () {
   };
 
   function init_edge_mode(node) {
-    tmp_edge = new Edge(node, new Node(0, 0), true);
+    tmp_nodeFrom = node;
+    tmp_nodeTo = new Node(0, 0);
+    // tmp_edge = new Edge(tmp_nodeFrom, new Node(0, 0),false)
     edge_mode = true;
     $(canvas_element).on('mousemove', on_move);
   }
 
   function end_edge_mode(node) {
-    tmp_edge.setTo(node);
-    world.add_edge(tmp_edge);
-    tmp_edge = new Edge(node, new Node(0, 0), true);
+    // tmp_edge.setTo(node)
+    world.add_edge(tmp_nodeFrom, node, false);
+    tmp_nodeFrom = node;
+    // tmp_edge = new Edge(node, new Node(0, 0),false)
     self.reset();
   }
 
@@ -437,8 +480,7 @@ module.exports = (function () {
       if (!edge_mode) init_edge_mode(node);else end_edge_mode(node);
     } else {
       if (edge_mode) interrupt_edge_mode();else {
-        node = new Node(x, y);
-        world.add_node(node);
+        node = world.add_node(x, y);
         self.draw_node(node);
       }
     }
@@ -460,20 +502,20 @@ module.exports = (function () {
 
     var node = world.get_node_near(e.clientX, e.clientY, 20);
     if (node) {
-      tmp_edge.nodeTo.x = node.x;
-      tmp_edge.nodeTo.y = node.y;
+      tmp_nodeTo.x = node.x;
+      tmp_nodeTo.y = node.y;
     } else {
-      tmp_edge.nodeTo.x = e.clientX;
-      tmp_edge.nodeTo.y = e.clientY;
+      tmp_nodeTo.x = e.clientX;
+      tmp_nodeTo.y = e.clientY;
     }
 
-    self.draw_edge(tmp_edge, '#f60', 0.5, 2);
+    self.draw_tmp_edge('#f60', 0.5, 2);
   }
 
   self.draw_nodes = function (nodes) {
     if (nodes) nodes.map(function (node) {
       return self.draw_node(node, 2, '#c99');
-    });else world.get_nodes().map(function (node) {
+    });else _.map(world.nodes, function (node) {
       return self.draw_node(node);
     });
   };
@@ -484,9 +526,11 @@ module.exports = (function () {
     var alpha = arguments.length <= 2 || arguments[2] === undefined ? 0.4 : arguments[2];
     var lineWidth = arguments.length <= 3 || arguments[3] === undefined ? 1 : arguments[3];
 
-    if (!edges) world.get_edges().map(function (edge) {
-      return self.draw_edge(edge, color, alpha, lineWidth);
-    });else edges.map(function (edge) {
+    if (!edges) {
+      _.map(world.edges, function (edge) {
+        return self.draw_edge(edge, color, alpha, lineWidth);
+      });
+    } else edges.map(function (edge) {
       return self.draw_edge(edge, color, alpha, lineWidth);
     });
   };
@@ -501,7 +545,7 @@ module.exports = (function () {
     var alpha = arguments.length <= 3 || arguments[3] === undefined ? 0.9 : arguments[3];
 
     canvas.shadowColor = '#666';
-    canvas.shadowBlur = 5;
+    canvas.shadowBlur = 3;
     canvas.shadowOffsetX = 0;
     canvas.shadowOffsetY = 0;
 
@@ -512,11 +556,27 @@ module.exports = (function () {
     canvas.fill();
   };
 
+  self.draw_tmp_edge = function () {
+    var color = arguments.length <= 0 || arguments[0] === undefined ? '#000' : arguments[0];
+    var alpha = arguments.length <= 1 || arguments[1] === undefined ? 0.4 : arguments[1];
+    var lineWidth = arguments.length <= 2 || arguments[2] === undefined ? 1 : arguments[2];
+
+    canvas.shadowBlur = 0;
+    canvas.globalAlpha = alpha;
+    canvas.strokeStyle = color;
+    canvas.lineWidth = lineWidth;
+    canvas.beginPath();
+    canvas.moveTo(tmp_nodeFrom.x, tmp_nodeFrom.y);
+    canvas.lineTo(tmp_nodeTo.x, tmp_nodeTo.y);
+    canvas.stroke();
+  };
+
   self.draw_edge = function (edge) {
     var color = arguments.length <= 1 || arguments[1] === undefined ? '#000' : arguments[1];
     var alpha = arguments.length <= 2 || arguments[2] === undefined ? 0.4 : arguments[2];
     var lineWidth = arguments.length <= 3 || arguments[3] === undefined ? 1 : arguments[3];
 
+    if (!edge.one_way) lineWidth *= 2;
     canvas.shadowBlur = 0;
     canvas.globalAlpha = alpha;
     canvas.strokeStyle = color;
@@ -720,60 +780,57 @@ module.exports = function (possibilities, probabilities) {
 ;require.register("edge", function(exports, require, module) {
 'use strict';
 
-function Edge(nodeFrom, nodeTo, do_not_connect) {
+var Edge = (function () {
+  var id = 0;
 
-  if (nodeFrom.equals(nodeTo)) {
-    console.log('Impossibile creare un arco tra due nodi equivalenti');
-    throw new Error('Impossibile creare un arco tra due nodi equivalenti');
-  }
+  return function Edge(nodeFrom, nodeTo, one_way) {
 
-  this.nodeFrom = nodeFrom;
-  this.nodeTo = nodeTo;
+    console.log(nodeFrom);
+    if (nodeFrom.equals(nodeTo)) throw new Error('Impossibile creare un arco tra due nodi equivalenti');
 
-  if (!do_not_connect) {
+    if (nodeFrom.other_side_is(nodeTo)) throw new Error('Edge gia presente!!');
 
-    nodeFrom.add_connection(this);
+    if (nodeTo.other_side_is(nodeFrom)) throw new Error('Edge gia presentsdf se!!');
 
-    nodeTo.add_connection(this);
-
+    this.id = id++;
+    this.nodeFrom = nodeFrom;
+    this.nodeTo = nodeTo;
+    nodeFrom.add_connection(this.id);
     this.weight = this.length();
-  }
-}
-
-Edge.prototype.length = function () {
-  if (this.nodeFrom && this.nodeTo) {
-    var lat1 = this.nodeFrom.x,
-        lat2 = this.nodeTo.x,
-        lon1 = this.nodeFrom.y,
-        lon2 = this.nodeTo.y;
-    var p = 0.017453292519943295; // Math.PI / 180
-    var c = Math.cos;
-    var a = 0.5 - c((lat2 - lat1) * p) / 2 + c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
-
-    return 12742 * Math.asin(Math.sqrt(a));
-
-    // return Math.sqrt(Math.pow(this.nodeFrom.x - this.nodeTo.x, 2) + Math.pow(this.nodeFrom.y - this.nodeTo.y, 2))
-  } else return 0;
-};
-
-Edge.prototype.add_pherormone = function () {
-  this.pherormon++;
-};
+    this.one_way = one_way;
+    if (!this.one_way) {
+      console.log('non e one way quindi aggiungo anche la connection al contrario');
+      nodeTo.add_connection(this.id);
+    }
+    return id;
+  };
+})();
 
 Edge.prototype.in = function (edges) {
-  var _this = this;
-
-  return edges.findIndex(function (e) {
-    return e.equals(_this);
-  }) !== -1;
+  return edges.find(function (e) {
+    this.equals(e);
+  });
 };
 
-Edge.prototype.in_index = function (edges) {
-  var _this2 = this;
+Edge.prototype.length = function () {
+  // if (this.nodeFrom && this.nodeTo) {
+  //   var lat1 = this.nodeFrom.x,
+  //     lat2 = this.nodeTo.x,
+  //     lon1 = this.nodeFrom.y,
+  //     lon2 = this.nodeTo.y
+  //   var p = 0.017453292519943295; // Math.PI / 180
+  //   var c = Math.cos;
+  //   var a = 0.5 - c((lat2 - lat1) * p) / 2 +
+  //     c(lat1 * p) * c(lat2 * p) *
+  //     (1 - c((lon2 - lon1) * p)) / 2;
 
-  return edges.findIndex(function (e) {
-    return e.equals(_this2);
-  });
+  //   return 12742 * Math.asin(Math.sqrt(a));
+  //  
+  return this.nodeFrom.distance(this.nodeTo.x, this.nodeFrom.y);
+
+  // return Math.sqrt(Math.pow(this.nodeFrom.x - this.nodeTo.x, 2) + Math.pow(this.nodeFrom.y - this.nodeTo.y, 2))
+  // } else
+  // return 0
 };
 
 Edge.prototype.setFrom = function (nodeFrom) {
@@ -789,51 +846,61 @@ Edge.prototype.setTo = function (nodeTo) {
 };
 
 Edge.prototype.equals = function (edge) {
-  return edge.nodeFrom.equals(this.nodeFrom) && edge.nodeTo.equals(this.nodeTo) || edge.nodeTo.equals(this.nodeFrom) && edge.nodeFrom.equals(this.nodeTo);
-};
-
-Edge.prototype.connected = function (edge) {
-  return edge.nodeFrom.equals(this.nodeTo) || edge.nodeTo.equals(this.nodeFrom) || edge.nodeFrom.equals(this.nodeFrom) || edge.nodeTo.equals(this.nodeTo);
+  return edge.nodeFrom == this.nodeFrom && edge.nodeTo == this.nodeTo || edge.nodeTo == this.nodeFrom && edge.nodeFrom == this.nodeTo;
 };
 
 module.exports = Edge;
 });
 
 ;require.register("node", function(exports, require, module) {
-'use strict';
+"use strict";
 
-function Node(x, y) {
+var Node = (function () {
+  var id = 0;
 
-  this.x = x;
-  this.y = y;
+  return function Node(x, y) {
+    this.id = id++;
+    this.x = x;
+    this.y = y;
+    this.connections = [];
+    // this.n_connections = 0
+  };
+})();
 
-  this.connections = [];
-  this.connection_weight = [];
-}
+Node.prototype.connected_to = function (edge_id) {
+  return this.connections.indexOf(edge_id);
+};
+
+Node.prototype.other_side_is = function (nodeTo) {
+  var world = require('world');
+  return this.connections.find(function (edge_id) {
+    return world.edges[edge_id].nodeTo.id == nodeTo.id;
+  });
+};
+
+Node.prototype.other_side = function (edge) {
+  if (edge.nodeFrom == this) return edge.nodeTo;
+  if (edge.nodeTo == this) return edge.nodeFrom;
+  console.log("IMPOSSIBILE esser qui !!!");
+};
+
+Node.prototype.add_connection = function (edge_id) {
+  this.connections.push(edge_id);
+};
+
+Node.prototype.remove_connection = function (edge_id) {
+  _.remove(this.connections, function (edge) {
+    return edge == edge_id;
+  });
+};
 
 Node.prototype.in = function (nodes) {
   var _this = this;
 
-  return nodes.find(function (node) {
-    return _this.equals(node);
+  // console.log(nodes)
+  return _(nodes).find(function (n) {
+    return _this.equals(n);
   });
-};
-
-Node.prototype.add_connection = function (edge) {
-  if (edge.in(this.connections)) {
-    console.log('connection gia presente');
-    return;
-  }
-  this.connections.push(edge);
-  this.connection_weight.push(1);
-};
-
-Node.prototype.add_pherormone = function (edge) {
-  // console.log('dentro add_pherormone')
-  // console.log(edge)
-  // console.log(edge.in_index(this.connections))
-  // console.log(this.connection_weight)
-  this.connection_weight[edge.in_index(this.connections)] += 0.5;
 };
 
 Node.prototype.equals = function (node) {
@@ -841,7 +908,6 @@ Node.prototype.equals = function (node) {
 };
 
 Node.prototype.distance = function (x, y) {
-
   return Math.sqrt(Math.pow(this.x - x, 2) + Math.pow(this.y - y, 2));
 };
 
@@ -859,43 +925,59 @@ module.exports = (function () {
 
   var self = {};
 
-  self.edges = [];
-  self.nodes = [];
+  self.edges = {};
+  self.nodes = {};
   var Edge = require('edge');
   var Node = require('node');
+  var Ant = require('ant');
 
   var best_path = undefined;
-
   self.edges_length = 0;
+
+  self.add_node = function (x, y) {
+    var node = new Node(x, y);
+    // console.log(node)
+    node = node.in(self.nodes) || node;
+    self.nodes[node.id] = node;
+    self.canvas.draw_node(node);
+    return node;
+  };
+
+  self.add_edge = function (nodeFrom, nodeTo, one_way) {
+    // console.log(nodeFrom)
+    // console.log(nodeTo)
+
+    var edge = new Edge(nodeFrom, nodeTo, one_way);
+    self.edges[edge.id] = edge;
+    self.canvas.draw_edge(edge);
+    self.edges_length += edge.weight;
+    self.edges_length = parseFloat(self.edges_length).toFixed(2);
+    return edge;
+  };
 
   self.load = function () {
     $.getJSON('map2.json').then(function (loaded_edges) {
       loaded_edges.forEach(function (e) {
-        var nodeFrom = new Node(e[0][0], e[0][1]);
-        var nodeTo = new Node(e[1][0], e[1][1]);
 
-        if (!nodeFrom.in(self.nodes)) self.nodes.push(nodeFrom);
-        if (!nodeTo.in(self.nodes)) self.nodes.push(nodeTo);
-        try {
-          self.edges.push(new Edge(nodeFrom.in(self.nodes), nodeTo.in(self.nodes), false));
-        } catch (e) {
-          console.log(e);
-        }
+        var nodeFrom = self.add_node(e[0][0], e[0][1]);
+        var nodeTo = self.add_node(e[1][0], e[1][1]);
+
+        self.add_edge(nodeFrom, nodeTo, false); //e[2]) // dentro e[2] c'e' one way
       });
       self.canvas.reset();
     });
   };
 
   self.save = function () {
-    return self.edges.map(function (edge) {
+    return _.map(self.edges, function (edge) {
       return [[edge.nodeFrom.x, edge.nodeFrom.y], [edge.nodeTo.x, edge.nodeTo.y]];
     });
   };
 
   self.restart = function () {
     console.log('deosidnfo');
-    self.edges = [];
-    self.nodes = [];
+    self.edges = {};
+    self.nodes = {};
     self.edges_length = 0;
     this.canvas.reset();
   };
@@ -904,18 +986,13 @@ module.exports = (function () {
     return best_path;
   };
 
-  self.add_node = function (node) {
-    self.nodes.push(node);
-    self.canvas.draw_node(node);
-    return node;
-  };
-
   self.get_random_node = function () {
-    return self.nodes[Math.floor(Math.random() * self.nodes.length)];
+    return _.sample(self.nodes);
+    // return self.nodes[Math.floor(Math.random() * self.nodes.length)]
   };
 
   self.get_random_edge = function () {
-    return self.edges[Math.floor(Math.random() * self.edges.length)];
+    return _.sample(self.edges); //[Math.floor(Math.random() * self.edges.length)]
   };
 
   function rand(max) {
@@ -923,36 +1000,33 @@ module.exports = (function () {
   }
 
   self.add_random_node = function (max_x, max_y) {
-    var node = new Node(rand(max_x), rand(max_y));
-    if (self.nodes.findIndex(function (n) {
-      return n.equals(node);
-    }) !== -1) {
-      self.add_random_node();
-      return;
-    }
-    self.add_node(node);
+    self.add_node(rand(max_x), rand(max_y));
   };
 
   self.add_random_edge = function () {
-    var nodeFrom = rand(self.nodes.length);
-    var nodeTo = rand(self.nodes.length);
-
-    // ensure node index is different
-    while (nodeTo === nodeFrom) {
-      nodeTo = rand(self.nodes.length);
-    }var edge = new Edge(self.nodes[nodeFrom], self.nodes[nodeTo]);
-    self.add_edge(edge);
+    self.add_edge(self.get_random_node(), self.get_random_node(), false);
   };
 
-  var Ant = require('ant');
-
   self.search_odd_node = function () {
-    console.log("Total self.nodes " + self.nodes.length);
-    var odds = self.nodes.filter(function (node) {
+    console.log("Total self.nodes " + _(self.nodes).size());
+    var odds = _.filter(self.nodes, function (node) {
       return node.connections.length % 2;
     });
     console.log("Odd self.nodes: " + odds.length);
     self.canvas.draw_nodes(odds);
+    return odds;
+  };
+
+  self.get_leaf_nodes = function () {
+    return _.filter(self.nodes, function (node) {
+      return node.connections.length === 1;
+    });
+  };
+
+  self.get_random_leaf_node = function () {
+    var leaf_nodes = self.get_leaf_nodes();
+    if (leaf_nodes.length) return _.sample(leaf_nodes);
+    return false;
   };
 
   self.cycle = function () {
@@ -1014,37 +1088,41 @@ module.exports = (function () {
     return res;
   };
 
-  self.add_edge = function (edge) {
-    if (!edge.in(self.edges)) {
-      self.edges.push(edge);
-
-      self.canvas.draw_edge(edge);
-      self.edges_length += edge.weight;
-      self.edges_length = parseFloat(self.edges_length).toFixed(2);
-    } else console.log('edge doppio o nodeFrom=nodeTo');
-    return edge;
+  self.remove_leafs = function () {
+    self.get_leaf_nodes().forEach(self.remove_until_t);
+    self.canvas.reset();
   };
 
-  self.get_nodes = function () {
-    return self.nodes;
-  };
-  self.get_edges = function () {
-    return self.edges;
+  self.remove_until_t = function (from_node) {
+    var current_node = from_node;
+    var edge_id_to_remove = null;
+    var edge = null;
+    var next_node = null;
+
+    while (current_node.connections.length === 1) {
+      edge_id_to_remove = current_node.connections[0];
+      edge = self.edges[edge_id_to_remove];
+      next_node = current_node.other_side(edge);
+      current_node.remove_connection(edge_id_to_remove);
+      next_node.remove_connection(edge_id_to_remove);
+      delete self.edges[edge_id_to_remove];
+      delete self.nodes[current_node.id];
+      current_node = next_node;
+    }
+    // self.canvas.reset()
   };
 
   self.get_node_at = function (x, y) {
-    var res = self.nodes.filter(function (node) {
+    var res = _(self.nodes).filter(function (node) {
       return node.x === x && node.y === y;
     });
     if (res.length === 1) return res[0];else return false;
   };
 
   self.get_node_near = function (x, y, distance) {
-    var res = self.nodes.filter(function (node) {
+    return _.find(self.nodes, function (node) {
       return node.distance(x, y) <= distance;
     });
-    if (res.length >= 1) return res[0];
-    return false;
   };
 
   return self;

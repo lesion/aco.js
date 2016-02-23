@@ -2,40 +2,54 @@ module.exports = (function() {
 
   var self = {}
 
-  self.edges = []
-  self.nodes = []
+  self.edges = {}
+  self.nodes = {}
   let Edge = require('edge')
   let Node = require('node')
+  let Ant = require('ant')
 
   let best_path
-
   self.edges_length = 0
-  
+
+  self.add_node = function(x, y) {
+    let node = new Node(x, y)
+      // console.log(node)
+    node = node.in(self.nodes) || node
+    self.nodes[node.id] = node
+    self.canvas.draw_node(node)
+    return node
+  }
+
+  self.add_edge = function(nodeFrom, nodeTo, one_way) {
+    // console.log(nodeFrom)
+    // console.log(nodeTo)
+
+    let edge = new Edge(nodeFrom, nodeTo, one_way)
+    self.edges[edge.id] = edge
+    self.canvas.draw_edge(edge)
+    self.edges_length += edge.weight
+    self.edges_length = parseFloat(self.edges_length).toFixed(2)
+    return edge
+  }
 
   self.load = function() {
     $.getJSON('map2.json')
       .then(loaded_edges => {
         loaded_edges.forEach(e => {
-          let nodeFrom = new Node(e[0][0], e[0][1])
-          let nodeTo = new Node(e[1][0], e[1][1])
 
-          if (!nodeFrom.in(self.nodes))
-            self.nodes.push(nodeFrom)
-          if (!nodeTo.in(self.nodes))
-            self.nodes.push(nodeTo)
-          try {
-            self.edges.push(new Edge(nodeFrom.in(self.nodes), nodeTo.in(self.nodes),false))
-          }
-          catch(e){
-            console.log(e)
-          }
+          let nodeFrom = self.add_node(e[0][0], e[0][1])
+          let nodeTo = self.add_node(e[1][0], e[1][1])
+
+          self.add_edge(nodeFrom, nodeTo, false) //e[2]) // dentro e[2] c'e' one way
+
         })
         self.canvas.reset()
       })
   }
 
+
   self.save = function() {
-    return self.edges.map(edge => [
+    return _.map(self.edges, edge => [
       [edge.nodeFrom.x, edge.nodeFrom.y],
       [edge.nodeTo.x, edge.nodeTo.y]
     ])
@@ -43,8 +57,8 @@ module.exports = (function() {
 
   self.restart = function() {
     console.log('deosidnfo')
-    self.edges = []
-    self.nodes = []
+    self.edges = {}
+    self.nodes = {}
     self.edges_length = 0
     this.canvas.reset()
   }
@@ -53,18 +67,13 @@ module.exports = (function() {
     return best_path
   }
 
-  self.add_node = function(node) {
-    self.nodes.push(node)
-    self.canvas.draw_node(node)
-    return node
-  }
-
   self.get_random_node = function() {
-    return self.nodes[Math.floor(Math.random() * self.nodes.length)]
+    return _.sample(self.nodes)
+      // return self.nodes[Math.floor(Math.random() * self.nodes.length)]
   }
 
   self.get_random_edge = function() {
-    return self.edges[Math.floor(Math.random() * self.edges.length)]
+    return _.sample(self.edges) //[Math.floor(Math.random() * self.edges.length)]
   }
 
   function rand(max) {
@@ -72,35 +81,33 @@ module.exports = (function() {
   }
 
   self.add_random_node = function(max_x, max_y) {
-    var node = new Node(rand(max_x), rand(max_y))
-    if (self.nodes.findIndex(n => n.equals(node)) !== -1) {
-      self.add_random_node()
-      return
-    }
-    self.add_node(node)
+    self.add_node(rand(max_x), rand(max_y))
   }
 
   self.add_random_edge = function() {
-    var nodeFrom = rand(self.nodes.length)
-    var nodeTo = rand(self.nodes.length)
-
-    // ensure node index is different
-    while (nodeTo === nodeFrom)
-      nodeTo = rand(self.nodes.length)
-
-    let edge = new Edge(self.nodes[nodeFrom], self.nodes[nodeTo])
-    self.add_edge(edge)
+    self.add_edge(self.get_random_node(), self.get_random_node(), false)
   }
 
-  let Ant = require('ant')
 
   self.search_odd_node = function() {
-    console.log("Total self.nodes " + self.nodes.length)
-    let odds = self.nodes.filter(node => node.connections.length % 2)
+    console.log("Total self.nodes " + _(self.nodes).size())
+    let odds = _.filter(self.nodes, node => node.connections.length % 2)
     console.log("Odd self.nodes: " + odds.length)
     self.canvas.draw_nodes(odds)
+    return odds
   }
 
+
+  self.get_leaf_nodes = function() {
+    return _.filter(self.nodes, node => node.connections.length === 1)
+  }
+
+  self.get_random_leaf_node = function() {
+    var leaf_nodes = self.get_leaf_nodes()
+    if (leaf_nodes.length)
+      return _.sample(leaf_nodes)
+    return false
+  }
 
 
   self.cycle = function() {
@@ -142,24 +149,32 @@ module.exports = (function() {
     return res
   }
 
-  self.add_edge = function(edge) {
-    if (!edge.in(self.edges)) {
-      self.edges.push(edge)
-
-      self.canvas.draw_edge(edge)
-      self.edges_length += edge.weight
-      self.edges_length = parseFloat(self.edges_length).toFixed(2)
-    } else
-      console.log('edge doppio o nodeFrom=nodeTo')
-    return edge
+  self.remove_leafs = function() {
+    self.get_leaf_nodes().forEach(self.remove_until_t)
+    self.canvas.reset()
   }
 
+  self.remove_until_t = function(from_node) {
+    var current_node = from_node
+    let edge_id_to_remove = null
+    let edge = null
+    let next_node = null
 
-  self.get_nodes = () => self.nodes
-  self.get_edges = () => self.edges
+    while (current_node.connections.length === 1) {
+      edge_id_to_remove = current_node.connections[0]
+      edge = self.edges[edge_id_to_remove]
+      next_node = current_node.other_side(edge)
+      current_node.remove_connection(edge_id_to_remove)
+      next_node.remove_connection(edge_id_to_remove)
+      delete self.edges[edge_id_to_remove]
+      delete self.nodes[current_node.id]
+      current_node = next_node
+    }
+    // self.canvas.reset()
+  }
 
   self.get_node_at = function(x, y) {
-    let res = self.nodes.filter(node => (node.x === x && node.y === y))
+    let res = _(self.nodes).filter(node => (node.x === x && node.y === y))
     if (res.length === 1)
       return res[0]
     else
@@ -167,12 +182,7 @@ module.exports = (function() {
   }
 
   self.get_node_near = function(x, y, distance) {
-    let res = self.nodes.filter(function(node) {
-      return node.distance(x, y) <= distance
-    })
-    if (res.length >= 1)
-      return res[0]
-    return false
+    return _.find(self.nodes, node => node.distance(x, y) <= distance)
   }
 
 

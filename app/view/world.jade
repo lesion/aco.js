@@ -7,9 +7,15 @@
       button(@click='add_node') Add random Node
       button(@click='add_edge') Add random Edge
       button(@click='load_map') Load map
+      button(@click='save_map') Save map
+      button(@click='create_ant') Create ant
+      button(@click='move_ant') Move ant
+      button(@click='search_odd_node') Odd vertex
+      button(@click='remove_leafs') Remove leafs
 
     .left
       ul
-        li n.nodes {{ n_nodes }}
-        li n.edges {{ n_edges }}
-        li length {{ edges_length }}
+        //- li n.nodes {{ n_nodes }}
+        //- li n.edges {{ n_edges }}
+        //- li length {{ edges_length }}
+        //- li ant {{ ant.path_l }}

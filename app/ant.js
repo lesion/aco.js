@@ -2,117 +2,133 @@ function Ant(start_node = null) {
 
   this.world = require('world')
   this.canvas = require('canvas')
-  this.visited_edge = []
-  this.unvisited_edge = this.world.get_edges().slice()
+  this.visited_edge = {}
+  this.unvisited_edge = _.cloneDeep(this.world.edges)
   this.path = []
   this.path_l = 0
   this.current_node = start_node
 
-  this.last_edge = null
+  this.last_edge_id = -1
 
   if (!this.current_node)
-    this.current_node = this.world.get_random_node()
+    this.current_node = this.world.get_random_leaf_node()
 
 }
 
 Ant.prototype.reset = function() {
-  this.visited_edge = []
-  this.unvisited_edge = this.world.get_edges().slice()
+  this.visited_edge = {}
+  this.unvisited_edge =  _.cloneDeep(this.world.edges)
   this.path = []
   this.path_l = 0
-  this.current_node = this.world.get_random_node()
+  this.last_edge_id = -1
+  this.current_node = this.world.get_random_leaf_node()
 }
 
-Ant.prototype.visit = function(edge) {
+Ant.prototype.visit = function(edge_id) {
 
-  // console.log(edge)  
+  let edge = this.current_node.connections[edge_id]
 
+  
   // add this edge to path
-  this.path.push(edge)
+  this.path.push(edge_id)
 
   // increase the path length
   this.path_l += edge.weight
-
 
   // this.current_node.add_pherormone(edge)
   // console.log(this.current_node.connection_weight)
 
   // update current node
-  this.current_node = (this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom)
+  this.current_node = this.current_node.other_size(edge)//(this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom)
 
   //add this edge to visited one
   // this.visited_edge.push(edge)
 
   // search the index of this edge in unvisited edges
-  let edge_index = this.unvisited_edge.findIndex(e => edge.equals(e))
-  this.last_edge = edge
+  // let edge_index = this.unvisited_edge.findIndex(e => edge.equals(e))
+  this.last_edge_id = edge_id
     //remove this edge from unvisited edges!
-  if (edge_index > -1)
-    this.unvisited_edge.splice(edge_index, 1)
+  // if (edge_index > -1)
+  delete this.unvisited_edge[edge_id]
+    // this.unvisited_edge.splice(edge_index, 1)
 
+  this.canvas.draw_edge(edge, '#f66', 0.4, 3)
 
   // edge.add_pherormone()
-};
+}
 
+// faccio una mossa
 Ant.prototype.move = function() {
-
-  let next_edge = null
-    // se ho solamente due scelte, vado avanti
-  if (this.current_node.connections.length == 2 && this.last_edge != null) {
-    if (this.current_node.connections[0].equals(this.last_edge))
-      next_edge = this.current_node.connections[1]
-    else
-      next_edge = this.current_node.connections[0]
-      // this.canvas.draw_node(this.current_node, 2, '#f66',0.5)
-    this.visit(next_edge)
-    this.canvas.draw_edge(next_edge, '#f66', 0.4, 3)
-    this.move()
-    return false
-
-  } else
-    next_edge = this.decision_maker()
-
-  // this.canvas.draw_node(this.current_node, 2, '#f66')
-  this.visit(next_edge)
-  this.canvas.draw_edge(next_edge, '#f66', 0.4, 3)
-  // this.canvas.draw_edge(next_edge, '#f66')
-
-  // check if path is complete and all edges are visited
-  if (this.has_finish()) {
+  if (this.has_finish()){
+    console.log('FINITO!')
     return ([this.path_l, this.path])
   }
+  if (this.forced_move()) return false
+  let next_edge_id = this.decision_maker()
+  this.visit(next_edge_id)
+  this.forced_move()
+
   return false
 }
 
-Ant.prototype.run = function() {
-  // let next_edge = null
-  var ret = this.move()
-  while (ret == false){
-    ret = this.move()
+
+// fa una mossa forzata (ad esempio se sono davanti ad un vicolo cieco o se posso solo andare avanti)
+Ant.prototype.forced_move = function() {
+  let edges = _.map(this.current_node.connections, edge => edge.id )
+  let next_edge_id = null
+  if (edges.length == 1)
+    next_edge_id = edges[0]
+  else if (edges.length === 2 && this.last_edge_id != null) {
+    if (edges[0] === last_edge_id)
+      next_edge_id = edges[1]
+    else
+      next_edge_id = edges[0]
   }
-  console.log(ret)
-  console.log('sono qui ?')
-  return ret
+
+  if (!next_edge_id) return false
+
+  this.visit(next_edge_id)
+  this.forced_move()
+  return true
+
+}
+
+Ant.prototype.run = function() {
+  var that = this
+  var ret = this.move()
+  var loop = setInterval(function(){
+    ret = that.move()
+    if(ret!=false){
+      console.log('finito!!')
+      clearTimeout(loop)
+    }
+  },50)
+
 };
 
 Ant.prototype.has_finish = function() {
-  return (this.unvisited_edge.length === 0)
+  console.log(this.unvisited_edge.length, "unvisited")
+  return (_.size(this.unvisited_edge.length) === 0)
 };
 
 Ant.prototype.is_unvisited = function(edge) {
-  return edge.in(this.unvisited_edge)
+  return this.unvisited_edge[edge.id]
 }
 
-Ant.prototype.is_visited = function(edge) {
-  return edge.in(this.visited_edge)
-}
-
-Ant.prototype.n_visited = function(edge) {
-  let v = this.path.reduce((tot, e) => (e.equals(edge) ? ++tot : tot), 0)
-  return v
-};
 
 var choose = require('choose')
+
+/**
+ * It selects a move by applying a probabilistic decision rule. The
+probabilistic decision rule is a function of (1) the locally available
+pheromone trails and heuristic values (i.e., pheromone trails and
+heuristic values associated with components and connections in the
+neighborhood of the ant’s current location on graph GC); (2) the
+ant’s private memory storing its current state; and (3) the problem
+constraints.
+ * [decision_maker description]
+ * @return {[type]} [description]
+ */
 Ant.prototype.decision_maker = function() {
   // this.canvas.reset()
   let possible_edges = this.current_node.connections
@@ -142,7 +158,7 @@ Ant.prototype.decision_maker = function() {
 var Edge = require('edge')
 
 Ant.prototype.get_probability = function(edge, enjoy) {
-  return (10*edge.weight / (this.n_visited(edge)*1000))
+  return (10 * edge.weight / (this.n_visited(edge) * 1000))
 
 
   return ((1000 + enjoy * 1000) / this.n_visited(edge) * 100) / edge.weight
