@@ -17,10 +17,10 @@ module.exports = (function() {
     world.canvas = self
     height = h
     width = w
-    canvas_element = document.getElementsByTagName('canvas')[0]//$('#canvas')[0]
+    canvas_element = document.getElementsByTagName('canvas')[0] //$('#canvas')[0]
     canvas = canvas_element.getContext('2d')
     edge_mode = false
-    // tmp_edge = null
+      // tmp_edge = null
     $(canvas_element).click(on_click)
 
     clear()
@@ -32,9 +32,9 @@ module.exports = (function() {
     let n_edge = n_elements * 4
 
     for (let i = 0; i < n_elements; i++)
-      world.add_random_node(width,height)
+      world.add_random_node(width, height)
 
-    for (let i = 0; i < n_edge; i++) 
+    for (let i = 0; i < n_edge; i++)
       world.add_random_edge()
 
     self.reset()
@@ -43,8 +43,8 @@ module.exports = (function() {
 
   function init_edge_mode(node) {
     tmp_nodeFrom = node
-    tmp_nodeTo = new Node(0,0)
-    // tmp_edge = new Edge(tmp_nodeFrom, new Node(0, 0),false)
+    tmp_nodeTo = new Node(0, 0)
+      // tmp_edge = new Edge(tmp_nodeFrom, new Node(0, 0),false)
     edge_mode = true
     $(canvas_element).on('mousemove', on_move)
 
@@ -52,9 +52,9 @@ module.exports = (function() {
 
   function end_edge_mode(node) {
     // tmp_edge.setTo(node)
-    world.add_edge(tmp_nodeFrom,node,false)
+    world.add_edge(tmp_nodeFrom, node, false)
     tmp_nodeFrom = node
-    // tmp_edge = new Edge(node, new Node(0, 0),false)
+      // tmp_edge = new Edge(node, new Node(0, 0),false)
     self.reset()
   }
 
@@ -65,11 +65,12 @@ module.exports = (function() {
   }
 
   function on_click(e) {
-    let x = e.clientX
-    let y = e.clientY
+    let x = e.clientX*2
+    let y = e.clientY*2
 
 
     let node = world.get_node_near(x, y, 15)
+    console.log(node)
 
     if (node) { // found a node near click
       if (!edge_mode)
@@ -81,19 +82,19 @@ module.exports = (function() {
       if (edge_mode)
         interrupt_edge_mode()
       else {
-        node = world.add_node(x,y)
+        node = world.add_node(x, y)
         self.draw_node(node)
       }
     }
   }
 
 
-  self.restart = function(){
+  self.restart = function() {
     world.restart()
     clear()
   }
 
-  self.reset =function() {
+  self.reset = function() {
     clear()
     self.draw_nodes()
     self.draw_edges()
@@ -102,71 +103,72 @@ module.exports = (function() {
   function on_move(e) {
     self.reset()
 
-    let node = world.get_node_near(e.clientX, e.clientY, 20)
+    let node = world.get_node_near(e.clientX*2, e.clientY*2, 20)
     if (node) {
       tmp_nodeTo.x = node.x
       tmp_nodeTo.y = node.y
     } else {
-      tmp_nodeTo.x = e.clientX
-      tmp_nodeTo.y = e.clientY
+      tmp_nodeTo.x = e.clientX*2
+      tmp_nodeTo.y = e.clientY*2
 
     }
 
-    self.draw_tmp_edge( '#f60', 0.5, 2)
+    self.draw_tmp_edge('#f60', 0.5, 2)
   }
 
 
   self.draw_nodes = function(nodes) {
-    if(nodes)
-      nodes.map(node => self.draw_node(node,2,'#c99'))
+    if (nodes)
+      nodes.map(node => self.draw_node(node, 2, '#c99'))
     else
-      _.map(world.nodes,node => self.draw_node(node))
+      _.map(world.nodes, node => self.draw_node(node))
   }
 
 
 
   self.draw_edges = function(edges = false, color = '#000', alpha = 0.4, lineWidth = 1) {
-    if (!edges)
-    {
-      _.map(world.edges,edge => self.draw_edge(edge, color, alpha, lineWidth))
-    }
-    else
+    if (!edges) {
+      _.map(world.edges, edge => self.draw_edge(edge, color, alpha, lineWidth))
+    } else{
+
       edges.map(edge => self.draw_edge(edge, color, alpha, lineWidth))
+    }
   }
 
   function clear() {
-    canvas.clearRect(0, 0, width, height);
+    canvas.clearRect(0, 0, width*2, height*2);
   }
 
   self.draw_node = function(node, size = 1, color = '#00f', alpha = 0.9) {
-
     canvas.shadowColor = '#666';
-    canvas.shadowBlur = 3;
+    canvas.shadowBlur = 0;
     canvas.shadowOffsetX = 0;
     canvas.shadowOffsetY = 0;
 
-    canvas.globalAlpha = alpha;
+    // canvas.globalAlpha = alpha;
     canvas.fillStyle = color;
     canvas.beginPath();
     canvas.arc(node.x, node.y, size, 0, 2 * Math.PI);
     canvas.fill();
   }
 
-  self.draw_tmp_edge = function( color = '#000', alpha = 0.4, lineWidth = 1){
+  self.draw_tmp_edge = function(color = '#000', alpha = 0.4, lineWidth = 1) {
     canvas.shadowBlur = 0;
-    canvas.globalAlpha = alpha;
+    // canvas.globalAlpha = alpha;
     canvas.strokeStyle = color;
     canvas.lineWidth = lineWidth;
     canvas.beginPath();
-    canvas.moveTo(tmp_nodeFrom.x,tmp_nodeFrom.y);
+    canvas.moveTo(tmp_nodeFrom.x, tmp_nodeFrom.y);
     canvas.lineTo(tmp_nodeTo.x, tmp_nodeTo.y);
     canvas.stroke();
   }
 
   self.draw_edge = function(edge, color = '#000', alpha = 0.4, lineWidth = 1) {
-    if(!edge.one_way) lineWidth*=2
+    if (edge.one_way) {
+      color = '#f66'
+    }
     canvas.shadowBlur = 0;
-    canvas.globalAlpha = alpha;
+    // canvas.globalAlpha = alpha;
     canvas.strokeStyle = color;
     canvas.lineWidth = lineWidth;
     canvas.beginPath();

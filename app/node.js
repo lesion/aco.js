@@ -17,7 +17,7 @@ Node.prototype.connected_to = function(edge_id) {
 
 
 Node.prototype.other_side_is = function(nodeTo) {
-  let world = require('world')
+  var world = require('world')
   return this.connections.find(edge_id => world.edges[edge_id].nodeTo.id==nodeTo.id )
 
 }

@@ -123,7 +123,7 @@ jade_debug.unshift(new jade.DebugItem( 1, "app/view/world.jade" ));
 buf.push("\n<div id=\"container\">");
 jade_debug.unshift(new jade.DebugItem( undefined, jade_debug[0].filename ));
 jade_debug.unshift(new jade.DebugItem( 2, "app/view/world.jade" ));
-buf.push("\n  <canvas width=\"900px\" height=\"600px\">");
+buf.push("\n  <canvas width=\"1800px\" height=\"1200px\">");
 jade_debug.unshift(new jade.DebugItem( undefined, jade_debug[0].filename ));
 jade_debug.shift();
 buf.push("</canvas>");
@@ -255,7 +255,7 @@ buf.push("\n</div>");
 jade_debug.shift();
 jade_debug.shift();;return buf.join("");
 } catch (err) {
-  jade.rethrow(err, jade_debug[0].filename, jade_debug[0].lineno, "#container\n  canvas(width=\"900px\",height=\"600px\")\n  #panel\n    .left\n      button(@click='restart') Clear All\n      button(@click='random_map') Generate random map\n      button(@click='add_node') Add random Node\n      button(@click='add_edge') Add random Edge\n      button(@click='load_map') Load map\n      button(@click='save_map') Save map\n      button(@click='create_ant') Create ant\n      button(@click='move_ant') Move ant\n      button(@click='search_odd_node') Odd vertex\n      button(@click='remove_leafs') Remove leafs\n\n    .left\n      ul\n        //- li n.nodes {{ n_nodes }}\n        //- li n.edges {{ n_edges }}\n        //- li length {{ edges_length }}\n        //- li ant {{ ant.path_l }}\n");
+  jade.rethrow(err, jade_debug[0].filename, jade_debug[0].lineno, "#container\n  canvas(width=\"1800px\",height=\"1200px\")\n  #panel\n    .left\n      button(@click='restart') Clear All\n      button(@click='random_map') Generate random map\n      button(@click='add_node') Add random Node\n      button(@click='add_edge') Add random Edge\n      button(@click='load_map') Load map\n      button(@click='save_map') Save map\n      button(@click='create_ant') Create ant\n      button(@click='move_ant') Move ant\n      button(@click='search_odd_node') Odd vertex\n      button(@click='remove_leafs') Remove leafs\n\n    .left\n      ul\n        //- li n.nodes {{ n_nodes }}\n        //- li n.edges {{ n_edges }}\n        //- li length {{ edges_length }}\n        //- li ant {{ ant.path_l }}\n");
 }
 };
 });

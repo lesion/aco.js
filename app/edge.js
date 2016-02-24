@@ -2,9 +2,8 @@ var Edge = (function() {
   var id = 0
 
 
-  return function Edge(nodeFrom, nodeTo, one_way) {
+  return function Edge(nodeFrom, nodeTo, one_way, rotonda) {
 
-    console.log(nodeFrom)
     if (nodeFrom.equals(nodeTo))
       throw new Error('Impossibile creare un arco tra due nodi equivalenti')
 
@@ -20,8 +19,8 @@ var Edge = (function() {
     nodeFrom.add_connection(this.id)
     this.weight = this.length()
     this.one_way = one_way
+    this.rotonda = rotonda
     if(!this.one_way){
-      console.log('non e one way quindi aggiungo anche la connection al contrario')
       nodeTo.add_connection(this.id)
     }
     return id

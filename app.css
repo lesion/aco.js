@@ -5,7 +5,9 @@ html, body {
 
 canvas {
   display: block;
-  border: 1px dashed #555; }
+  border: 1px dashed #555;
+  width: 900px;
+  height: 600px; }
 
 #panel {
   padding: 10px; }

@@ -17,7 +17,7 @@ function Ant(start_node = null) {
 
 Ant.prototype.reset = function() {
   this.visited_edge = {}
-  this.unvisited_edge =  _.cloneDeep(this.world.edges)
+  this.unvisited_edge = _.cloneDeep(this.world.edges)
   this.path = []
   this.path_l = 0
   this.last_edge_id = -1
@@ -26,9 +26,9 @@ Ant.prototype.reset = function() {
 
 Ant.prototype.visit = function(edge_id) {
 
-  let edge = this.current_node.connections[edge_id]
+  console.log('visito il edge', edge_id)
+  let edge = this.world.edges[edge_id]
 
-  
   // add this edge to path
   this.path.push(edge_id)
 
@@ -39,7 +39,7 @@ Ant.prototype.visit = function(edge_id) {
   // console.log(this.current_node.connection_weight)
 
   // update current node
-  this.current_node = this.current_node.other_size(edge)//(this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom)
+  this.current_node = this.current_node.other_side(edge) //(this.current_node.equals(edge.nodeFrom) ? edge.nodeTo : edge.nodeFrom)
 
   //add this edge to visited one
   // this.visited_edge.push(edge)
@@ -48,18 +48,18 @@ Ant.prototype.visit = function(edge_id) {
   // let edge_index = this.unvisited_edge.findIndex(e => edge.equals(e))
   this.last_edge_id = edge_id
     //remove this edge from unvisited edges!
-  // if (edge_index > -1)
+    // if (edge_index > -1)
   delete this.unvisited_edge[edge_id]
     // this.unvisited_edge.splice(edge_index, 1)
 
-  this.canvas.draw_edge(edge, '#f66', 0.4, 3)
+  this.canvas.draw_edge(edge, '#6f6', 0.7, 5)
 
   // edge.add_pherormone()
 }
 
 // faccio una mossa
 Ant.prototype.move = function() {
-  if (this.has_finish()){
+  if (this.has_finish()) {
     console.log('FINITO!')
     return ([this.path_l, this.path])
   }
@@ -74,12 +74,13 @@ Ant.prototype.move = function() {
 
 // fa una mossa forzata (ad esempio se sono davanti ad un vicolo cieco o se posso solo andare avanti)
 Ant.prototype.forced_move = function() {
-  let edges = _.map(this.current_node.connections, edge => edge.id )
+  // let edges = _.map(this.current_node.connections, edge => edge.id)
+  let edges = this.current_node.connections
   let next_edge_id = null
   if (edges.length == 1)
     next_edge_id = edges[0]
-  else if (edges.length === 2 && this.last_edge_id != null) {
-    if (edges[0] === last_edge_id)
+  else if (edges.length === 2 && this.last_edge_id != -1 && this.world.edges[this.last_edge_id].rotonda) {
+    if (edges[0] === this.last_edge_id)
       next_edge_id = edges[1]
     else
       next_edge_id = edges[0]
@@ -87,6 +88,12 @@ Ant.prototype.forced_move = function() {
 
   if (!next_edge_id) return false
 
+  if(this.n_visited(next_edge_id)>20)
+  {
+    console.log('MA PORCODIO!')
+    console.log(next_edge_id)
+    return true
+  }
   this.visit(next_edge_id)
   this.forced_move()
   return true
@@ -96,19 +103,19 @@ Ant.prototype.forced_move = function() {
 Ant.prototype.run = function() {
   var that = this
   var ret = this.move()
-  var loop = setInterval(function(){
+  var loop = setInterval(function() {
     ret = that.move()
-    if(ret!=false){
+    if (ret != false) {
       console.log('finito!!')
       clearTimeout(loop)
     }
-  },50)
+  }, 50)
 
 };
 
 Ant.prototype.has_finish = function() {
-  console.log(this.unvisited_edge.length, "unvisited")
-  return (_.size(this.unvisited_edge.length) === 0)
+  console.log(_.size(this.unvisited_edge), "unvisited")
+  return (_.size(this.unvisited_edge) === 0)
 };
 
 Ant.prototype.is_unvisited = function(edge) {
@@ -132,15 +139,9 @@ constraints.
 Ant.prototype.decision_maker = function() {
   // this.canvas.reset()
   let possible_edges = this.current_node.connections
-
-
-  // se ho solo due scelte possibili, non torno indietro 
-  // if(possible_edges.length==2)
-
-  let edges_height = this.current_node.connection_weight
   let edges_probabilities = []
 
-  // this.canvas.draw_edges(possible_edges,'#6f6')
+
 
   // ogni via ha una probabilita' di essere presa
   // che dipende da diversi fattori
@@ -150,25 +151,38 @@ Ant.prototype.decision_maker = function() {
   // 4- se sono state tutte percorse, quale e' quella percorsa meno volte?
   // 5- quale strada mi avvicina di piu' alla strada piu' vicina non visitata
 
-  edges_probabilities = possible_edges.map((e, idx) => this.get_probability(e, edges_height[idx]))
-  return choose(possible_edges, edges_probabilities)
+  edges_probabilities = possible_edges.map(e => this.get_probability(e))
+  console.log(possible_edges)
+  console.log(edges_probabilities)
+  var c = choose(possible_edges, edges_probabilities)
+  return c
 
 }
 
 var Edge = require('edge')
 
-Ant.prototype.get_probability = function(edge, enjoy) {
-  return (10 * edge.weight / (this.n_visited(edge) * 1000))
+Ant.prototype.n_visited = function(edge_id) {
+  var n = 1
+  this.path.forEach(e => e == edge_id ? n += 1 : 0)
+  return n
+};
+
+Ant.prototype.get_probability = function(edge_id, enjoy) {
+  if(this.is_unvisited(edge_id))
+    return 100
+
+  let edge = this.world.edges[edge_id]
+  return (1000 / Math.pow(this.n_visited(edge_id),3))
 
 
-  return ((1000 + enjoy * 1000) / this.n_visited(edge) * 100) / edge.weight
+  return ((1000 + enjoy * 1000) / this.n_visited(edge_id) * 100) / edge.weight
   let probability = 10000
 
 
   // piu' e' stata percorsa meno voglio ripercorrerla
   // if(this.n_visited(edge)) 
   probability *= enjoy
-  probability /= (this.n_visited(edge) * 200)
+  probability /= (this.n_visited(edge_id) * 200)
   probability /= edge.weight
 
 

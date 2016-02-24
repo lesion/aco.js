@@ -11,36 +11,73 @@ module.exports = (function() {
   let best_path
   self.edges_length = 0
 
-  self.add_node = function(x, y) {
+  self.add_node = function(x, y, draw = true) {
     let node = new Node(x, y)
       // console.log(node)
     node = node.in(self.nodes) || node
     self.nodes[node.id] = node
-    self.canvas.draw_node(node)
+    if (draw)
+      self.canvas.draw_node(node)
     return node
   }
 
-  self.add_edge = function(nodeFrom, nodeTo, one_way) {
+  self.add_edge = function(nodeFrom, nodeTo, one_way, rotonda) {
     // console.log(nodeFrom)
     // console.log(nodeTo)
 
-    let edge = new Edge(nodeFrom, nodeTo, one_way)
+    let edge = new Edge(nodeFrom, nodeTo, one_way, rotonda)
     self.edges[edge.id] = edge
+
+    // if (draw)
     self.canvas.draw_edge(edge)
+
     self.edges_length += edge.weight
     self.edges_length = parseFloat(self.edges_length).toFixed(2)
     return edge
   }
 
   self.load = function() {
+
+    function scale_map(loaded_edges) {
+      // calculate max and min
+      var min = {
+        x: Infinity,
+        y: Infinity
+      }
+      var max = {
+        x: 0,
+        y: 0
+      }
+
+      loaded_edges.forEach(e => {
+        min.x = Math.min(e.from.x, e.to.x, min.x)
+        min.y = Math.min(e.from.y, e.to.y, min.y)
+        max.x = Math.max(e.from.x, e.to.x, max.x)
+        max.y = Math.max(e.from.y, e.to.y, max.y)
+      })
+
+
+      // proporzione per x
+      // width : max.x - min.x =  x : latX
+
+
+      loaded_edges.forEach( e => { 
+        e.from.x = (e.from.x-min.x)*1800/(max.x-min.x)
+        e.from.y = (e.from.y-min.y)*1200/(max.y-min.y)
+        e.to.x = (e.to.x-min.x)*1800/(max.x-min.x)
+        e.to.y = (e.to.y-min.y)*1200/(max.y-min.y)
+      })
+      console.log(loaded_edges[1])
+      return loaded_edges
+    }
+
     $.getJSON('map2.json')
+      .then(scale_map)
       .then(loaded_edges => {
         loaded_edges.forEach(e => {
-
-          let nodeFrom = self.add_node(e[0][0], e[0][1])
-          let nodeTo = self.add_node(e[1][0], e[1][1])
-
-          self.add_edge(nodeFrom, nodeTo, false) //e[2]) // dentro e[2] c'e' one way
+          let nodeFrom = self.add_node(e.from.x, e.from.y, false)
+          let nodeTo = self.add_node(e.to.x, e.to.y, false)
+          self.add_edge(nodeFrom, nodeTo, e.one_way, e.rotonda) //e[2]) // dentro e[2] c'e' one way
 
         })
         self.canvas.reset()

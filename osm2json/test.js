@@ -1,4 +1,4 @@
-var obj = require('./piossa.json')
+var obj = require('./piossa2.json')
 var Node = require('../app/node.js')
 var Edge = require('../app/edge.js')
 
@@ -40,7 +40,19 @@ var Edge = require('../app/edge.js')
 
 
 var strade = obj.features.filter(o => o.properties.hasOwnProperty('highway') &&
-  ['unclassified', 'residential', 'primary', 'tertiary', 'primary-link', 'living_street'].indexOf(o.properties.highway) > -1)
+  ['unclassified',
+    'residential',
+    'primary',
+    'service',
+    'secondary',
+    'road',
+    'motorway',
+    'trunk',
+    'tertiary',
+    'secondary_link',
+    'tertiary_link',
+    'living_street'
+  ].indexOf(o.properties.highway) > -1)
 
 
 
@@ -54,36 +66,35 @@ strade.forEach(strada => {
   var from_node = null
   var one_way = (strada.properties.hasOwnProperty('oneway') &&
     strada.properties.oneway == 'yes')
-  strada.geometry.coordinates.forEach(nodo => {
-    nodo[0] -= 7.4245208
-    nodo[1] -= 44.9628869
-    max_x = (nodo[0] > max_x ? nodo[0] : max_x)
-    max_y = (nodo[1] > max_y ? nodo[1] : max_y)
-    min_x = (nodo[0] < min_x ? nodo[0] : min_x)
-    min_y = (nodo[1] < min_y ? nodo[1] : min_y)
-      // var edge = [nodo[0],nodo[1]]
+  var rotonda = (strada.properties.hasOwnProperty('junction') &&
+    strada.properties.junction == 'roundabout')
+  strada.geometry.coordinates.forEach(node => {
     if (!from_node) {
-      from_node = nodo
+      from_node = node
       return
     }
-    if ((from_node[0] == nodo[0] && from_node[1] == nodo[1])) return
-    edges.push([
-      [from_node[0], from_node[1]],
-      [nodo[0], nodo[1]],
-      one_way
-    ])
-    from_node = nodo
+    if ((from_node[0] == node[0] && from_node[1] == node[1])) return
+    var edge = {
+      from: {
+        x: from_node[0],
+        y: from_node[1]
+      },
+      to: {
+        x: node[0],
+        y: node[1]
+      },
+      one_way: one_way || rotonda,
+      rotonda: rotonda
+    }
+    edges.push(edge)
+    from_node = node
   })
 })
 
 
 // devo aggiungere il one way 
 
-console.log(JSON.stringify(edges.map(e => [
-    [e[0][0] * 900 / max_x, e[0][1] * 500 / max_y],
-    [e[1][0] * 900 / max_x, e[1][1] * 500 / max_y],
-    e[2]
-  ])))
+console.log(JSON.stringify(edges))
   // console.log("min_x: ", min_x )
   // console.log("min_y: ", min_y )
   // console.log("max_x: ", max_x )
